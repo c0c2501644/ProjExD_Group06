@@ -153,6 +153,27 @@ class Enemy(pg.sprite.Sprite):
         if self.rect.right < 0:
             self.kill()
 
+
+# -----------------------------
+# PowerUp（パワーアップアイテム）
+# -----------------------------
+class PowerUp(pg.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pg.Surface((20, 20))
+        self.image.fill((0, 255, 255))  # 水色のアイテム
+        self.rect = self.image.get_rect()
+
+        self.rect.x = WIDTH + random.randint(0, 200)
+        self.rect.y = random.randint(50, HEIGHT - 50)
+        self.speed = 3
+
+    def update(self):
+        self.rect.x -= self.speed
+        if self.rect.right < 0:
+            self.kill()
+
+
 # -----------------------------
 # Background scroll
 # -----------------------------
@@ -164,6 +185,16 @@ def draw_background(scroll_x):
     screen.blit(bg, (0, 0))
     for x, y in stars:
         pg.draw.circle(screen, (200, 200, 255), ((x - scroll_x) % WIDTH, y), 2)
+
+powerup_group = pg.sprite.Group()
+powerup_timer = 0
+powerup_active = False
+powerup_end_time = 0
+
+# 連射間隔（通常：15フレーム）
+shot_interval = 15
+shot_timer = 0
+
 
 # -----------------------------
 # Main Game Loop
@@ -186,8 +217,10 @@ while True:
             sys.exit()
         if not game_over and ev.type == pg.KEYDOWN:
             if ev.key == pg.K_SPACE:
-                bullet_group.add(Bullet(player.rect.right, player.rect.centery))
-
+                if shot_timer <= 0:
+                    bullet_group.add(Bullet(player.rect.right, player.rect.centery))
+                    shot_timer = shot_interval
+                    
     if not game_over:
         scroll_x += 3
 
@@ -199,6 +232,30 @@ while True:
         player_group.update()
         bullet_group.update()
         enemy_group.update()
+
+        # 連射タイマー
+        if shot_timer > 0:
+            shot_timer -= 1
+
+        # パワーアップ出現
+        powerup_timer += 1
+        if powerup_timer > 300:  # 5秒に1回くらい
+            powerup_group.add(PowerUp())
+            powerup_timer = 0
+
+        powerup_group.update()
+
+        # プレイヤーがパワーアップ取得
+        if pg.sprite.spritecollide(player, powerup_group, True):
+            powerup_active = True
+            shot_interval = 0  # ★ 連射速度アップ！
+            powerup_end_time = pg.time.get_ticks() + 8000  # 8秒間
+
+        # 効果時間が切れたら戻す
+        if powerup_active and pg.time.get_ticks() > powerup_end_time:
+            powerup_active = False
+            shot_interval = 15
+
 
         # 敵と衝突 → ゲームオーバー
         if pg.sprite.spritecollide(player, enemy_group, True):
@@ -213,6 +270,7 @@ while True:
     player_group.draw(screen)
     bullet_group.draw(screen)
     enemy_group.draw(screen)
+    powerup_group.draw(screen)
     score.draw(screen)  # ★ スコア表示
 
     if game_over:
