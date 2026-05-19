@@ -8,7 +8,7 @@ import os
 # -----------------------------
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 print("Fixed directory:", os.getcwd())
-
+  
 # -----------------------------
 # 初期設定
 # -----------------------------
@@ -124,6 +124,27 @@ class Bullet(pg.sprite.Sprite):
         if self.rect.x > WIDTH:
             self.kill()
 
+# =========================================================
+# ★追加：Laser（貫通レーザー）
+# =========================================================
+class Laser(pg.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+
+        # レーザー画像
+        self.image = pg.Surface((120, 12))
+        self.image.fill((0, 255, 255))
+
+        self.rect = self.image.get_rect(midleft=(x, y))
+
+        self.speed = 18
+
+    def update(self):
+        self.rect.x += self.speed
+
+        if self.rect.left > WIDTH:
+            self.kill()     
+
 # -----------------------------
 # Enemy（画像読み込み＋自動縮小）
 # -----------------------------
@@ -171,6 +192,7 @@ def draw_background(scroll_x):
 player = Player()
 player_group = pg.sprite.Group(player)
 bullet_group = pg.sprite.Group()
+laser_group = pg.sprite.Group()  # レーザーグループ追加
 enemy_group = pg.sprite.Group()
 score = Score()  # ★ スコア追加
 
@@ -178,6 +200,8 @@ enemy_spawn_timer = 0
 scroll_x = 0
 game_over = False
 font = pg.font.Font(None, 80)
+
+laser_cooldown = 0  # レーザーのクールダウンタイマー
 
 while True:
     for ev in pg.event.get():
@@ -187,9 +211,16 @@ while True:
         if not game_over and ev.type == pg.KEYDOWN:
             if ev.key == pg.K_SPACE:
                 bullet_group.add(Bullet(player.rect.right, player.rect.centery))
+            elif ev.key == pg.K_x and laser_cooldown <= 0:  # xキーでレーザー発射
+                laser_group.add(Laser(player.rect.right, player.rect.centery))
+                laser_cooldown = 60  # 1秒のクールダウン
 
     if not game_over:
         scroll_x += 3
+
+        # レーザークールダウン減少
+        if laser_cooldown > 0:
+            laser_cooldown -= 1
 
         enemy_spawn_timer += 1
         if enemy_spawn_timer > 40:
@@ -198,6 +229,7 @@ while True:
 
         player_group.update()
         bullet_group.update()
+        laser_group.update()  # レーザーも更新
         enemy_group.update()
 
         # 敵と衝突 → ゲームオーバー
@@ -209,9 +241,15 @@ while True:
         if hits:
             score.add(100)
 
+        # レーザーが敵に当たったらスコア加算
+        laser_hits = pg.sprite.groupcollide(laser_group, enemy_group, False, True)
+        if laser_hits:
+            score.add(100)
+
     draw_background(scroll_x)
     player_group.draw(screen)
     bullet_group.draw(screen)
+    laser_group.draw(screen)
     enemy_group.draw(screen)
     score.draw(screen)  # ★ スコア表示
 
